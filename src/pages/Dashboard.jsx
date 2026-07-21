@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import API from '../api';
 
 export default function Dashboard() {
@@ -6,6 +7,7 @@ export default function Dashboard() {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [error, setError] = useState('');
+    const navigate = useNavigate();
 
     // Sayfa açıldığında projeleri çek
     useEffect(() => {
@@ -84,7 +86,11 @@ export default function Dashboard() {
                 ) : (
                     <div style={{ display: 'grid', gap: '15px' }}>
                         {projects.map((project) => (
-                            <div key={project.id} style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '6px', backgroundColor: '#f9f9f9' }}>
+                            <div
+                                key={project.id}
+                                onClick={() => navigate(`/projects/${project.id}`)}
+                                style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '6px', backgroundColor: '#f9f9f9', cursor: 'pointer' }}
+                            >
                                 <h4 style={{ margin: '0 0 8px 0' }}>{project.title}</h4>
                                 <p style={{ margin: 0, color: '#666' }}>{project.description}</p>
                             </div>
