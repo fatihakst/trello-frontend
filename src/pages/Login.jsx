@@ -1,4 +1,4 @@
-import { useState } from 'react';
+ï»¿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../api';
 
@@ -15,13 +15,13 @@ function Login() {
             localStorage.setItem('token', response.data.token);
             navigate('/');
         } catch (err) {
-            setError('Giriþ baþarýsýz. E-posta veya þifre hatalý!');
+            setError('GiriÅŸ baÅŸarÄ±sÄ±z. E-posta veya ÅŸifre hatalÄ±!');
         }
     };
 
     return (
         <div style={{ maxWidth: '350px', margin: '80px auto', fontFamily: 'sans-serif' }}>
-            <h2>Trello Clone - Giriþ Yap</h2>
+            <h2>Trello Clone - GiriÅŸ Yap</h2>
             {error && <p style={{ color: 'red' }}>{error}</p>}
             <form onSubmit={handleLogin}>
                 <div style={{ marginBottom: '10px' }}>
@@ -37,7 +37,7 @@ function Login() {
                 <div style={{ marginBottom: '10px' }}>
                     <input
                         type="password"
-                        placeholder="Þifre"
+                        placeholder="Åžifre"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
@@ -45,7 +45,7 @@ function Login() {
                     />
                 </div>
                 <button type="submit" style={{ width: '100%', padding: '10px', cursor: 'pointer' }}>
-                    Giriþ Yap
+                    GiriÅŸ Yap
                 </button>
             </form>
         </div>
