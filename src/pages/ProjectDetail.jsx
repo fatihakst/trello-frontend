@@ -15,6 +15,11 @@ export default function ProjectDetail() {
     const [loading, setLoading] = useState(true);
     const [isMounted, setIsMounted] = useState(false);
 
+    // YENİ: Modal için state'ler
+    const [editingTask, setEditingTask] = useState(null);
+    const [editTitle, setEditTitle] = useState('');
+    const [editDescription, setEditDescription] = useState('');
+
     useEffect(() => {
         setIsMounted(true);
         fetchProjectDetails();
@@ -96,26 +101,45 @@ export default function ProjectDetail() {
         }
     };
 
+    // YENİ: Düzenleme penceresini açar
+    const openEditModal = (task) => {
+        setEditingTask(task);
+        setEditTitle(task.title);
+        setEditDescription(task.description || '');
+    };
+
+    // YENİ: Değişiklikleri kaydeder
+    const handleSaveTask = async () => {
+        if (!editTitle.trim()) return;
+
+        try {
+            await API.put(`/Tasks/${editingTask.id}`, {
+                projectId: editingTask.projectId,
+                title: editTitle,
+                description: editDescription,
+                status: editingTask.status,
+                assignedToUserId: editingTask.assignedToUserId
+            });
+            setEditingTask(null); // Modalı kapat
+            fetchTasks(); // Güncel verileri çek
+        } catch (err) {
+            console.error('Görev güncellenirken hata:', err);
+        }
+    };
+
     const onDragEnd = async (result) => {
         const { destination, source, draggableId } = result;
 
         if (!destination) return;
         if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
-        // 1. Mevcut kart dizisinin kopyasını alıyoruz
         const items = Array.from(tasks);
-
-        // 2. Sürüklenen öğeyi bul ve diziden tamamen çıkar
         const draggedItemIndex = items.findIndex(t => t.id.toString() === draggableId);
         const [draggedItem] = items.splice(draggedItemIndex, 1);
 
-        // 3. Öğenin statüsünü (bulunduğu listeyi) hedef liste ile değiştir
         draggedItem.status = destination.droppableId;
-
-        // 4. Bırakılan hedef listenin o anki kartlarını bul
         const targetListItems = items.filter(t => t.status === destination.droppableId);
 
-        // 5. Öğeyi ana dizideki tam ve doğru sıraya yerleştir
         if (destination.index === 0) {
             if (targetListItems.length > 0) {
                 const insertIndex = items.indexOf(targetListItems[0]);
@@ -129,18 +153,15 @@ export default function ProjectDetail() {
             items.splice(insertIndex, 0, draggedItem);
         }
 
-        // 6. Sıralanmış listeyi ekrana bas (Arayüzde anında güncellenir ve sabit kalır)
         setTasks(items);
 
-        // 7. Değişikliği backend'e bildir
         const reorderData = items.map((task, index) => ({
             id: task.id,
-            order: index, // Dizideki sırasını Order olarak atıyoruz
+            order: index,
             status: task.status
         }));
 
         try {
-            // Tek bir karta istek atmak yerine, tüm listeyi yeni sırasıyla backend'e yolluyoruz
             await API.put('/Tasks/reorder', reorderData);
         } catch (err) {
             console.error('API Hatası:', err);
@@ -197,13 +218,24 @@ export default function ProjectDetail() {
                                                         }}
                                                     >
                                                         <span>{task.title}</span>
-                                                        <button
-                                                            onClick={() => handleDeleteTask(task.id)}
-                                                            style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
-                                                            title="Görevi Sil"
-                                                        >
-                                                            X
-                                                        </button>
+
+                                                        {/* YENİ: Düzenle ve Sil butonları yan yana */}
+                                                        <div>
+                                                            <button
+                                                                onClick={() => openEditModal(task)}
+                                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', marginRight: '8px' }}
+                                                                title="Görevi Düzenle"
+                                                            >
+                                                                ✏️
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteTask(task.id)}
+                                                                style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
+                                                                title="Görevi Sil"
+                                                            >
+                                                                X
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </Draggable>
@@ -243,6 +275,47 @@ export default function ProjectDetail() {
 
                 </div>
             </DragDropContext>
+
+            {/* YENİ: Kart Düzenleme Modalı */}
+            {editingTask && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+                    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+                }}>
+                    <div style={{
+                        backgroundColor: 'white', padding: '24px', borderRadius: '8px', width: '400px',
+                        display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                    }}>
+                        <h3 style={{ margin: '0 0 10px 0' }}>Kartı Düzenle</h3>
+
+                        <label style={{ fontSize: '14px', fontWeight: 'bold' }}>Başlık</label>
+                        <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            style={{ padding: '8px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }}
+                        />
+
+                        <label style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '10px' }}>Açıklama</label>
+                        <textarea
+                            value={editDescription}
+                            onChange={(e) => setEditDescription(e.target.value)}
+                            rows={4}
+                            placeholder="Bu görev için daha detaylı bir açıklama ekleyin..."
+                            style={{ padding: '8px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', resize: 'vertical' }}
+                        />
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                            <button onClick={() => setEditingTask(null)} style={{ padding: '8px 16px', cursor: 'pointer', background: 'transparent', border: '1px solid #ccc', borderRadius: '4px' }}>
+                                İptal
+                            </button>
+                            <button onClick={handleSaveTask} style={{ padding: '8px 16px', backgroundColor: '#0079bf', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                                Kaydet
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
