@@ -36,6 +36,21 @@ export default function Dashboard() {
         }
     };
 
+    // Proje silme fonksiyonu
+    const handleDeleteProject = async (projectId, e) => {
+        e.stopPropagation(); // Karta tıklanma (içine girme) olayını engeller, sadece butonu tetikler
+
+        const confirmDelete = window.confirm('Bu projeyi ve içindeki TÜM listeleri/görevleri silmek istediğinize emin misiniz? Bu işlem geri alınamaz.');
+        if (!confirmDelete) return;
+
+        try {
+            await API.delete(`/Projects/${projectId}`);
+            fetchProjects();
+        } catch (err) {
+            console.error('Proje silinirken hata:', err);
+        }
+    };
+
     const handleLogout = () => {
         localStorage.removeItem('token');
         window.location.href = '/login';
@@ -89,10 +104,28 @@ export default function Dashboard() {
                             <div
                                 key={project.id}
                                 onClick={() => navigate(`/projects/${project.id}`)}
-                                style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '6px', backgroundColor: '#f9f9f9', cursor: 'pointer' }}
+                                style={{ position: 'relative', padding: '15px', border: '1px solid #ddd', borderRadius: '6px', backgroundColor: '#f9f9f9', cursor: 'pointer' }}
                             >
                                 <h4 style={{ margin: '0 0 8px 0' }}>{project.title}</h4>
                                 <p style={{ margin: 0, color: '#666' }}>{project.description}</p>
+
+                                {/* YENİ: Proje Silme Butonu */}
+                                <button
+                                    onClick={(e) => handleDeleteProject(project.id, e)}
+                                    style={{
+                                        position: 'absolute',
+                                        top: '10px',
+                                        right: '10px',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#ff4d4f',
+                                        cursor: 'pointer',
+                                        fontSize: '16px'
+                                    }}
+                                    title="Projeyi Sil"
+                                >
+                                    🗑️
+                                </button>
                             </div>
                         ))}
                     </div>
