@@ -133,15 +133,17 @@ export default function ProjectDetail() {
         setTasks(items);
 
         // 7. Değişikliği backend'e bildir
+        const reorderData = items.map((task, index) => ({
+            id: task.id,
+            order: index, // Dizideki sırasını Order olarak atıyoruz
+            status: task.status
+        }));
+
         try {
-            await API.put(`/Tasks/${draggableId}`, {
-                title: draggedItem.title,
-                description: draggedItem.description || '',
-                status: draggedItem.status
-            });
+            // Tek bir karta istek atmak yerine, tüm listeyi yeni sırasıyla backend'e yolluyoruz
+            await API.put('/Tasks/reorder', reorderData);
         } catch (err) {
             console.error('API Hatası:', err);
-            // ÇÖZÜM: fetchTasks() satırını sildik. API reddetse bile kart ekranda bıraktığın yerde kalacak.
         }
     };
 
