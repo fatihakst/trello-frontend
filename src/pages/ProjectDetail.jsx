@@ -68,7 +68,6 @@ export default function ProjectDetail() {
         }
     };
 
-    // YENİ: Listeyi silme fonksiyonu
     const handleDeleteList = async (listId) => {
         const confirmDelete = window.confirm('Bu listeyi ve içindeki tüm görevleri silmek istediğinize emin misiniz?');
         if (!confirmDelete) return;
@@ -76,7 +75,7 @@ export default function ProjectDetail() {
         try {
             await API.delete(`/Lists/${listId}`);
             fetchLists();
-            fetchTasks(); // Listedeki görevler de silindiği için kartları da güncelliyoruz
+            fetchTasks();
         } catch (err) {
             console.error('Liste silinirken hata:', err);
         }
@@ -138,12 +137,36 @@ export default function ProjectDetail() {
         }
     };
 
+    // YENİ: Hem liste hem kart taşımayı ayırt eden ana fonksiyon
     const onDragEnd = async (result) => {
-        const { destination, source, draggableId } = result;
+        const { destination, source, draggableId, type } = result;
 
         if (!destination) return;
         if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
+        // 1. EĞER TAŞINAN ŞEY BİR LİSTEYSE (SÜTUN)
+        if (type === 'list') {
+            const newLists = Array.from(lists);
+            const [draggedList] = newLists.splice(source.index, 1);
+            newLists.splice(destination.index, 0, draggedList);
+
+            setLists(newLists); // Arayüzü anında güncelle
+
+            const reorderData = newLists.map((list, index) => ({
+                id: list.id,
+                order: index
+            }));
+
+            try {
+                await API.put('/Lists/reorder', reorderData);
+            } catch (err) {
+                console.error('Liste taşınırken hata:', err);
+                fetchLists();
+            }
+            return; // Liste taşıması bittiği için alttaki kart kodlarına geçmeden çık
+        }
+
+        // 2. EĞER TAŞINAN ŞEY BİR GÖREV (KART) İSE
         const items = Array.from(tasks);
         const draggedItemIndex = items.findIndex(t => t.id.toString() === draggableId);
         const [draggedItem] = items.splice(draggedItemIndex, 1);
@@ -196,89 +219,119 @@ export default function ProjectDetail() {
             <DragDropContext onDragEnd={onDragEnd}>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', overflowX: 'auto', paddingBottom: '20px', flexGrow: 1 }}>
 
-                    {lists.map((list) => (
-                        <div key={list.id} style={{ minWidth: '280px', backgroundColor: '#f4f5f7', padding: '10px', borderRadius: '8px' }}>
-
-                            {/* YENİ: Liste başlığı ve silme butonu yan yana */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                <h4 style={{ margin: '0', padding: '5px' }}>{list.title}</h4>
-                                <button
-                                    onClick={() => handleDeleteList(list.id)}
-                                    style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer', fontSize: '14px' }}
-                                    title="Listeyi Sil"
-                                >
-                                    🗑️
-                                </button>
-                            </div>
-
-                            <Droppable droppableId={list.id.toString()}>
-                                {(provided) => (
-                                    <div
-                                        ref={provided.innerRef}
-                                        {...provided.droppableProps}
-                                        style={{ minHeight: '20px', marginBottom: '10px' }}
-                                    >
-                                        {tasks.filter(task => task.status === list.id.toString()).map((task, index) => (
-                                            <Draggable key={task.id.toString()} draggableId={task.id.toString()} index={index}>
-                                                {(provided) => (
-                                                    <div
-                                                        ref={provided.innerRef}
-                                                        {...provided.draggableProps}
-                                                        {...provided.dragHandleProps}
-                                                        style={{
-                                                            userSelect: 'none',
-                                                            cursor: 'grab',
-                                                            backgroundColor: 'white',
-                                                            padding: '10px',
-                                                            borderRadius: '4px',
-                                                            marginBottom: '8px',
-                                                            boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                                                            display: 'flex',
-                                                            justifyContent: 'space-between',
-                                                            alignItems: 'center',
-                                                            ...provided.draggableProps.style
-                                                        }}
+                    {/* YENİ: Listelerin kendi aralarında taşınabilmesi için genel bir Droppable alanı */}
+                    <Droppable droppableId="all-lists" direction="horizontal" type="list">
+                        {(provided) => (
+                            <div
+                                ref={provided.innerRef}
+                                {...provided.droppableProps}
+                                style={{ display: 'flex', gap: '20px' }}
+                            >
+                                {lists.map((list, index) => (
+                                    <Draggable key={`list-${list.id}`} draggableId={`list-${list.id}`} index={index}>
+                                        {(provided) => (
+                                            <div
+                                                ref={provided.innerRef}
+                                                {...provided.draggableProps}
+                                                style={{
+                                                    minWidth: '280px',
+                                                    backgroundColor: '#f4f5f7',
+                                                    padding: '10px',
+                                                    borderRadius: '8px',
+                                                    ...provided.draggableProps.style
+                                                }}
+                                            >
+                                                {/* YENİ: Sadece bu başlık alanı listeyi sürüklemek için tutma yeridir */}
+                                                <div
+                                                    {...provided.dragHandleProps}
+                                                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', cursor: 'grab' }}
+                                                >
+                                                    <h4 style={{ margin: '0', padding: '5px' }}>{list.title}</h4>
+                                                    <button
+                                                        onClick={() => handleDeleteList(list.id)}
+                                                        style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer', fontSize: '14px' }}
+                                                        title="Listeyi Sil"
                                                     >
-                                                        <span>{task.title}</span>
+                                                        🗑️
+                                                    </button>
+                                                </div>
 
-                                                        <div>
-                                                            <button
-                                                                onClick={() => openEditModal(task)}
-                                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', marginRight: '8px' }}
-                                                                title="Görevi Düzenle"
-                                                            >
-                                                                ✏️
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteTask(task.id)}
-                                                                style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
-                                                                title="Görevi Sil"
-                                                            >
-                                                                X
-                                                            </button>
+                                                {/* Görevleri Taşıma Alanı (Önceki kodla aynı, sadece type eklendi) */}
+                                                <Droppable droppableId={list.id.toString()} type="task">
+                                                    {(provided) => (
+                                                        <div
+                                                            ref={provided.innerRef}
+                                                            {...provided.droppableProps}
+                                                            style={{ minHeight: '20px', marginBottom: '10px' }}
+                                                        >
+                                                            {tasks.filter(task => task.status === list.id.toString()).map((task, index) => (
+                                                                <Draggable key={task.id.toString()} draggableId={task.id.toString()} index={index}>
+                                                                    {(provided) => (
+                                                                        <div
+                                                                            ref={provided.innerRef}
+                                                                            {...provided.draggableProps}
+                                                                            {...provided.dragHandleProps}
+                                                                            style={{
+                                                                                userSelect: 'none',
+                                                                                cursor: 'grab',
+                                                                                backgroundColor: 'white',
+                                                                                padding: '10px',
+                                                                                borderRadius: '4px',
+                                                                                marginBottom: '8px',
+                                                                                boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                                                                                display: 'flex',
+                                                                                justifyContent: 'space-between',
+                                                                                alignItems: 'center',
+                                                                                ...provided.draggableProps.style
+                                                                            }}
+                                                                        >
+                                                                            <span>{task.title}</span>
+
+                                                                            <div>
+                                                                                <button
+                                                                                    onClick={() => openEditModal(task)}
+                                                                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', marginRight: '8px' }}
+                                                                                    title="Görevi Düzenle"
+                                                                                >
+                                                                                    ✏️
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => handleDeleteTask(task.id)}
+                                                                                    style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
+                                                                                    title="Görevi Sil"
+                                                                                >
+                                                                                    X
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </Draggable>
+                                                            ))}
+                                                            {provided.placeholder}
                                                         </div>
-                                                    </div>
-                                                )}
-                                            </Draggable>
-                                        ))}
-                                        {provided.placeholder}
-                                    </div>
-                                )}
-                            </Droppable>
+                                                    )}
+                                                </Droppable>
 
-                            <form onSubmit={(e) => handleAddTask(e, list.id)}>
-                                <input
-                                    type="text"
-                                    placeholder="Kart ekle..."
-                                    value={newTaskTitles[list.id] || ''}
-                                    onChange={(e) => setNewTaskTitles({ ...newTaskTitles, [list.id]: e.target.value })}
-                                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '5px', borderRadius: '4px', border: 'none' }}
-                                />
-                                <button type="submit" style={{ display: 'none' }}>Ekle</button>
-                            </form>
-                        </div>
-                    ))}
+                                                <form onSubmit={(e) => handleAddTask(e, list.id)}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Kart ekle..."
+                                                        value={newTaskTitles[list.id] || ''}
+                                                        onChange={(e) => setNewTaskTitles({ ...newTaskTitles, [list.id]: e.target.value })}
+                                                        style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '5px', borderRadius: '4px', border: 'none' }}
+                                                    />
+                                                    <button type="submit" style={{ display: 'none' }}>Ekle</button>
+                                                </form>
+                                            </div>
+                                        )}
+                                    </Draggable>
+                                ))}
+                                {provided.placeholder}
+                            </div>
+                        )}
+                    </Droppable>
 
+                    {/* Liste Ekleme Formu, sürüklenen listelerin dışında kalmalı */}
                     <div style={{ minWidth: '280px', backgroundColor: '#f4f5f7', padding: '10px', borderRadius: '8px' }}>
                         <form onSubmit={handleAddList}>
                             <input
