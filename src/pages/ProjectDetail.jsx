@@ -15,7 +15,6 @@ export default function ProjectDetail() {
     const [loading, setLoading] = useState(true);
     const [isMounted, setIsMounted] = useState(false);
 
-    // YENİ: Modal için state'ler
     const [editingTask, setEditingTask] = useState(null);
     const [editTitle, setEditTitle] = useState('');
     const [editDescription, setEditDescription] = useState('');
@@ -69,6 +68,20 @@ export default function ProjectDetail() {
         }
     };
 
+    // YENİ: Listeyi silme fonksiyonu
+    const handleDeleteList = async (listId) => {
+        const confirmDelete = window.confirm('Bu listeyi ve içindeki tüm görevleri silmek istediğinize emin misiniz?');
+        if (!confirmDelete) return;
+
+        try {
+            await API.delete(`/Lists/${listId}`);
+            fetchLists();
+            fetchTasks(); // Listedeki görevler de silindiği için kartları da güncelliyoruz
+        } catch (err) {
+            console.error('Liste silinirken hata:', err);
+        }
+    };
+
     const handleAddTask = async (e, listId) => {
         e.preventDefault();
         const title = newTaskTitles[listId];
@@ -101,14 +114,12 @@ export default function ProjectDetail() {
         }
     };
 
-    // YENİ: Düzenleme penceresini açar
     const openEditModal = (task) => {
         setEditingTask(task);
         setEditTitle(task.title);
         setEditDescription(task.description || '');
     };
 
-    // YENİ: Değişiklikleri kaydeder
     const handleSaveTask = async () => {
         if (!editTitle.trim()) return;
 
@@ -120,8 +131,8 @@ export default function ProjectDetail() {
                 status: editingTask.status,
                 assignedToUserId: editingTask.assignedToUserId
             });
-            setEditingTask(null); // Modalı kapat
-            fetchTasks(); // Güncel verileri çek
+            setEditingTask(null);
+            fetchTasks();
         } catch (err) {
             console.error('Görev güncellenirken hata:', err);
         }
@@ -187,7 +198,18 @@ export default function ProjectDetail() {
 
                     {lists.map((list) => (
                         <div key={list.id} style={{ minWidth: '280px', backgroundColor: '#f4f5f7', padding: '10px', borderRadius: '8px' }}>
-                            <h4 style={{ margin: '0 0 10px 0', padding: '5px' }}>{list.title}</h4>
+
+                            {/* YENİ: Liste başlığı ve silme butonu yan yana */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                <h4 style={{ margin: '0', padding: '5px' }}>{list.title}</h4>
+                                <button
+                                    onClick={() => handleDeleteList(list.id)}
+                                    style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer', fontSize: '14px' }}
+                                    title="Listeyi Sil"
+                                >
+                                    🗑️
+                                </button>
+                            </div>
 
                             <Droppable droppableId={list.id.toString()}>
                                 {(provided) => (
@@ -219,7 +241,6 @@ export default function ProjectDetail() {
                                                     >
                                                         <span>{task.title}</span>
 
-                                                        {/* YENİ: Düzenle ve Sil butonları yan yana */}
                                                         <div>
                                                             <button
                                                                 onClick={() => openEditModal(task)}
@@ -276,7 +297,6 @@ export default function ProjectDetail() {
                 </div>
             </DragDropContext>
 
-            {/* YENİ: Kart Düzenleme Modalı */}
             {editingTask && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
