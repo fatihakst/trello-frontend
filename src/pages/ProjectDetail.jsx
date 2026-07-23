@@ -15,9 +15,13 @@ export default function ProjectDetail() {
     const [loading, setLoading] = useState(true);
     const [isMounted, setIsMounted] = useState(false);
 
+    // Düzenleme state'leri
     const [editingTask, setEditingTask] = useState(null);
     const [editTitle, setEditTitle] = useState('');
     const [editDescription, setEditDescription] = useState('');
+    // YENİ: Etiket state'leri
+    const [editLabelText, setEditLabelText] = useState('');
+    const [editLabelColor, setEditLabelColor] = useState('#108ee9');
 
     useEffect(() => {
         setIsMounted(true);
@@ -113,12 +117,16 @@ export default function ProjectDetail() {
         }
     };
 
+    // YENİ: Modal açıldığında etiket bilgilerini de state'e alıyoruz
     const openEditModal = (task) => {
         setEditingTask(task);
         setEditTitle(task.title);
         setEditDescription(task.description || '');
+        setEditLabelText(task.labelText || '');
+        setEditLabelColor(task.labelColor || '#108ee9');
     };
 
+    // YENİ: Kaydederken etiket bilgilerini de backend'e gönderiyoruz
     const handleSaveTask = async () => {
         if (!editTitle.trim()) return;
 
@@ -128,7 +136,9 @@ export default function ProjectDetail() {
                 title: editTitle,
                 description: editDescription,
                 status: editingTask.status,
-                assignedToUserId: editingTask.assignedToUserId
+                assignedToUserId: editingTask.assignedToUserId,
+                labelText: editLabelText,
+                labelColor: editLabelColor
             });
             setEditingTask(null);
             fetchTasks();
@@ -137,20 +147,18 @@ export default function ProjectDetail() {
         }
     };
 
-    // YENİ: Hem liste hem kart taşımayı ayırt eden ana fonksiyon
     const onDragEnd = async (result) => {
         const { destination, source, draggableId, type } = result;
 
         if (!destination) return;
         if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
-        // 1. EĞER TAŞINAN ŞEY BİR LİSTEYSE (SÜTUN)
         if (type === 'list') {
             const newLists = Array.from(lists);
             const [draggedList] = newLists.splice(source.index, 1);
             newLists.splice(destination.index, 0, draggedList);
 
-            setLists(newLists); // Arayüzü anında güncelle
+            setLists(newLists);
 
             const reorderData = newLists.map((list, index) => ({
                 id: list.id,
@@ -163,10 +171,9 @@ export default function ProjectDetail() {
                 console.error('Liste taşınırken hata:', err);
                 fetchLists();
             }
-            return; // Liste taşıması bittiği için alttaki kart kodlarına geçmeden çık
+            return;
         }
 
-        // 2. EĞER TAŞINAN ŞEY BİR GÖREV (KART) İSE
         const items = Array.from(tasks);
         const draggedItemIndex = items.findIndex(t => t.id.toString() === draggableId);
         const [draggedItem] = items.splice(draggedItemIndex, 1);
@@ -219,7 +226,6 @@ export default function ProjectDetail() {
             <DragDropContext onDragEnd={onDragEnd}>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', overflowX: 'auto', paddingBottom: '20px', flexGrow: 1 }}>
 
-                    {/* YENİ: Listelerin kendi aralarında taşınabilmesi için genel bir Droppable alanı */}
                     <Droppable droppableId="all-lists" direction="horizontal" type="list">
                         {(provided) => (
                             <div
@@ -241,7 +247,6 @@ export default function ProjectDetail() {
                                                     ...provided.draggableProps.style
                                                 }}
                                             >
-                                                {/* YENİ: Sadece bu başlık alanı listeyi sürüklemek için tutma yeridir */}
                                                 <div
                                                     {...provided.dragHandleProps}
                                                     style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', cursor: 'grab' }}
@@ -256,7 +261,6 @@ export default function ProjectDetail() {
                                                     </button>
                                                 </div>
 
-                                                {/* Görevleri Taşıma Alanı (Önceki kodla aynı, sadece type eklendi) */}
                                                 <Droppable droppableId={list.id.toString()} type="task">
                                                     {(provided) => (
                                                         <div
@@ -280,28 +284,45 @@ export default function ProjectDetail() {
                                                                                 marginBottom: '8px',
                                                                                 boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
                                                                                 display: 'flex',
-                                                                                justifyContent: 'space-between',
-                                                                                alignItems: 'center',
+                                                                                flexDirection: 'column', // YENİ: İçerik alt alta gelsin diye column yapıldı
                                                                                 ...provided.draggableProps.style
                                                                             }}
                                                                         >
-                                                                            <span>{task.title}</span>
+                                                                            {/* YENİ: Etiket Gösterimi */}
+                                                                            {task.labelText && (
+                                                                                <div style={{
+                                                                                    backgroundColor: task.labelColor || '#108ee9',
+                                                                                    color: '#fff',
+                                                                                    padding: '4px 8px',
+                                                                                    borderRadius: '4px',
+                                                                                    fontSize: '12px',
+                                                                                    fontWeight: 'bold',
+                                                                                    marginBottom: '8px',
+                                                                                    alignSelf: 'flex-start'
+                                                                                }}>
+                                                                                    {task.labelText}
+                                                                                </div>
+                                                                            )}
 
-                                                                            <div>
-                                                                                <button
-                                                                                    onClick={() => openEditModal(task)}
-                                                                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', marginRight: '8px' }}
-                                                                                    title="Görevi Düzenle"
-                                                                                >
-                                                                                    ✏️
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={() => handleDeleteTask(task.id)}
-                                                                                    style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
-                                                                                    title="Görevi Sil"
-                                                                                >
-                                                                                    X
-                                                                                </button>
+                                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                                                                <span>{task.title}</span>
+
+                                                                                <div>
+                                                                                    <button
+                                                                                        onClick={() => openEditModal(task)}
+                                                                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', marginRight: '8px' }}
+                                                                                        title="Görevi Düzenle"
+                                                                                    >
+                                                                                        ✏️
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => handleDeleteTask(task.id)}
+                                                                                        style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
+                                                                                        title="Görevi Sil"
+                                                                                    >
+                                                                                        X
+                                                                                    </button>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                     )}
@@ -331,7 +352,6 @@ export default function ProjectDetail() {
                         )}
                     </Droppable>
 
-                    {/* Liste Ekleme Formu, sürüklenen listelerin dışında kalmalı */}
                     <div style={{ minWidth: '280px', backgroundColor: '#f4f5f7', padding: '10px', borderRadius: '8px' }}>
                         <form onSubmit={handleAddList}>
                             <input
@@ -369,7 +389,30 @@ export default function ProjectDetail() {
                             style={{ padding: '8px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }}
                         />
 
-                        <label style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '10px' }}>Açıklama</label>
+                        {/* YENİ: Etiket Düzenleme Alanı */}
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '5px' }}>
+                            <div style={{ flexGrow: 1 }}>
+                                <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Etiket Adı</label>
+                                <input
+                                    type="text"
+                                    placeholder="Örn: Acil, Frontend..."
+                                    value={editLabelText}
+                                    onChange={(e) => setEditLabelText(e.target.value)}
+                                    style={{ padding: '8px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Renk</label>
+                                <input
+                                    type="color"
+                                    value={editLabelColor}
+                                    onChange={(e) => setEditLabelColor(e.target.value)}
+                                    style={{ width: '40px', height: '35px', padding: '0', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}
+                                />
+                            </div>
+                        </div>
+
+                        <label style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '5px' }}>Açıklama</label>
                         <textarea
                             value={editDescription}
                             onChange={(e) => setEditDescription(e.target.value)}
